@@ -135,6 +135,7 @@ add_definitions(-DGNURADIO_VERSION=${GNURADIO_VERSION})
 # Setup the include and linker paths
 ########################################################################
 include_directories(
+    ${CMAKE_SOURCE_DIR}/include_fix
     ${Boost_INCLUDE_DIRS}
     ${GNURADIO_RUNTIME_INCLUDE_DIRS}
     ${CMAKE_BINARY_DIR}/lib
