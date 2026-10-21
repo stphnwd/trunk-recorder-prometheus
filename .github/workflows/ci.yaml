@@ -11,6 +11,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: README version matches the current quarter
+        # Pull requests only: a merge just before a quarter boundary must not
+        # fail the push to main. Reference: stphnwd/tools-test ci.yml.
+        if: github.event_name == 'pull_request'
+        run: |
+          version=$(tr -d '\r' < README.md | grep -Eo '^\*\*Version:\*\* *[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+ *$' | head -1 | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' || true)
+          if [ -z "$version" ]; then
+            echo "README.md has no '**Version:** YY.Q.feature.patch' line (four numeric fields, nothing after them)"; exit 1
+          fi
+          cur_year=$(date -u +%y); cur_qtr=$(( (10#$(date -u +%m) - 1) / 3 + 1 ))
+          year=${version%%.*}; rest=${version#*.}; qtr=${rest%%.*}
+          if [ "$((10#$year))" -eq "$((10#$cur_year))" ] && [ "$((10#$qtr))" -eq "$cur_qtr" ]; then
+            echo "ok: version $version is in quarter $cur_year.$cur_qtr (UTC)"
+          else
+            echo "README.md version is $version but the current quarter is $cur_year.$cur_qtr (UTC). Bump it to $cur_year.$cur_qtr.0.0."; exit 1
+          fi
+
   docker:
     permissions:
       contents: read
