@@ -1,5 +1,7 @@
 # Trunk Recorder Prometheus Plugin
 
+**Version:** 26.4.0.0
+
 This is a plugin for Trunk Recorder that publishes metrics in Prometheus format.
 
 ## Grafana Dashboard
