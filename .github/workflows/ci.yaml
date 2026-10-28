@@ -42,3 +42,37 @@ jobs:
     uses: USA-RedDragon/reusable-actions/.github/workflows/docker-ci.yaml@v1.3.1
     with:
       push: ${{ github.event_name != 'pull_request' }}
+  promote:
+    needs: checks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    concurrency:
+      group: promote-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Refuse a commit that did not arrive through a pull request
+        # GitHub cannot block a direct push to main on a free private repo, so
+        # this job is the consequence: a commit that bypassed the PR flow never
+        # reaches production. A PR merge commit has two parents. A squash or
+        # rebase merge has one, so those fall through to the API, which lists
+        # the merged pull request a commit belongs to.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          parents=$(git rev-list --parents -n 1 "$GITHUB_SHA" | wc -w)
+          if [ "$parents" -ge 3 ]; then
+            echo "ok: $GITHUB_SHA is a merge commit"; exit 0
+          fi
+          merged=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls"             --jq '[.[] | select(.merged_at != null and .base.ref == "main")] | length')
+          if [ "${merged:-0}" -ge 1 ]; then
+            echo "ok: $GITHUB_SHA closed a merged pull request into main"; exit 0
+          fi
+          echo "refusing to promote: $GITHUB_SHA reached main without a pull request"; exit 1
+      - name: Fast-forward production to the tested commit
+        run: git push origin ${{ github.sha }}:refs/heads/production
